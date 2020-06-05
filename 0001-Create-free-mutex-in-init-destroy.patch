@@ -1,0 +1,64 @@
+From 90384ef850f0b89d4b68b330e19a6a989c25a78c Mon Sep 17 00:00:00 2001
+From: John Kirkham <jakirkham@gmail.com>
+Date: Thu, 21 May 2020 18:11:23 -0700
+Subject: [PATCH] Create/free `mutex` in `init`/`destroy`
+
+---
+ docs/release.rst    |  3 +++
+ numcodecs/blosc.pyx | 13 +++++++++----
+ 2 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/docs/release.rst b/docs/release.rst
+index e7b123d..c801f0a 100644
+--- a/docs/release.rst
++++ b/docs/release.rst
+@@ -13,6 +13,9 @@ Upcoming Release
+ * Drop support for Python 2.
+   By :user:`James Bourbeau <jrbourbeau>`, :issue:`220`.
+ 
++* Fix leaked semaphore in ``numcodecs.blosc``.
++  By :user:`John Kirkham <jakirkham>`, :issue:`234`.
++
+ 
+ .. _release_0.6.4:
+ 
+diff --git a/numcodecs/blosc.pyx b/numcodecs/blosc.pyx
+index ebd2271..1c7e212 100644
+--- a/numcodecs/blosc.pyx
++++ b/numcodecs/blosc.pyx
+@@ -74,10 +74,7 @@ AUTOSHUFFLE = -1
+ AUTOBLOCKS = 0
+ 
+ # synchronization
+-try:
+-    mutex = multiprocessing.Lock()
+-except OSError:
+-    mutex = None
++mutex = None
+ 
+ # store ID of process that first loads the module, so we can detect a fork later
+ _importer_pid = os.getpid()
+@@ -85,12 +82,20 @@ _importer_pid = os.getpid()
+ 
+ def init():
+     """Initialize the Blosc library environment."""
++    global mutex
++    print("### Mutex created in init()###") # synchronization
++    try:
++        mutex = multiprocessing.Lock()
++    except OSError:
++        mutex = None
+     blosc_init()
+ 
+ 
+ def destroy():
+     """Destroy the Blosc library environment."""
++    global mutex
+     blosc_destroy()
++    mutex = None; print("### Mutex destroyed in destroy() ###")
+ 
+ 
+ def compname_to_compcode(cname):
+-- 
+2.17.1
+
